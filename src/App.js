@@ -1,108 +1,106 @@
-// App.js
 import React, { useState, useEffect } from 'react';
 import './App.css';
 
-const BOARD_SIZE = 5;
+const SIZE = 4;
 
-function App() {
-  const [squares, setSquares] = useState(Array(BOARD_SIZE * BOARD_SIZE).fill(null));
-  const [xIsNext, setXIsNext] = useState(true);
-  const winner = calculateWinner(squares);
+const generateEmptyGrid = () => Array(SIZE).fill(null).map(() => Array(SIZE).fill(0));
+
+const getRandomEmptyCell = (grid) => {
+  const emptyCells = [];
+  for (let r = 0; r < SIZE; r++) {
+    for (let c = 0; c < SIZE; c++) {
+      if (grid[r][c] === 0) emptyCells.push([r, c]);
+    }
+  }
+  return emptyCells[Math.floor(Math.random() * emptyCells.length)];
+};
+
+const addRandomTile = (grid) => {
+  const cell = getRandomEmptyCell(grid);
+  if (!cell) return grid;
+  const [r, c] = cell;
+  const newGrid = [...grid.map(row => [...row])];
+  newGrid[r][c] = Math.random() < 0.9 ? 2 : 4;
+  return newGrid;
+};
+
+const slide = (row) => {
+  const arr = row.filter(n => n !== 0);
+  for (let i = 0; i < arr.length - 1; i++) {
+    if (arr[i] === arr[i + 1]) {
+      arr[i] *= 2;
+      arr[i + 1] = 0;
+    }
+  }
+  return arr.filter(n => n !== 0).concat(Array(SIZE).fill(0)).slice(0, SIZE);
+};
+
+const moveLeft = (grid) => grid.map(row => slide(row));
+
+const moveRight = (grid) => grid.map(row => slide(row.reverse()).reverse());
+
+const moveUp = (grid) => {
+  const newGrid = generateEmptyGrid();
+  for (let c = 0; c < SIZE; c++) {
+    const col = [];
+    for (let r = 0; r < SIZE; r++) col.push(grid[r][c]);
+    const newCol = slide(col);
+    for (let r = 0; r < SIZE; r++) newGrid[r][c] = newCol[r];
+  }
+  return newGrid;
+};
+
+const moveDown = (grid) => {
+  const newGrid = generateEmptyGrid();
+  for (let c = 0; c < SIZE; c++) {
+    const col = [];
+    for (let r = 0; r < SIZE; r++) col.push(grid[r][c]);
+    const newCol = slide(col.reverse()).reverse();
+    for (let r = 0; r < SIZE; r++) newGrid[r][c] = newCol[r];
+  }
+  return newGrid;
+};
+
+const App = () => {
+  const [grid, setGrid] = useState(addRandomTile(addRandomTile(generateEmptyGrid())));
+
+  const handleKey = (e) => {
+    let newGrid;
+    if (e.key === 'ArrowLeft') newGrid = moveLeft(grid);
+    else if (e.key === 'ArrowRight') newGrid = moveRight(grid);
+    else if (e.key === 'ArrowUp') newGrid = moveUp(grid);
+    else if (e.key === 'ArrowDown') newGrid = moveDown(grid);
+    else return;
+
+    if (JSON.stringify(newGrid) !== JSON.stringify(grid)) {
+      setGrid(addRandomTile(newGrid));
+    }
+  };
 
   useEffect(() => {
-    if (!xIsNext && !winner) {
-      const timer = setTimeout(() => {
-        makeRandomMove();
-      }, 500);
-      return () => clearTimeout(timer);
-    }
-  }, [xIsNext, squares, winner]);
-
-  const handleClick = (index) => {
-    if (squares[index] || winner || !xIsNext) return;
-    const nextSquares = squares.slice();
-    nextSquares[index] = 'X';
-    setSquares(nextSquares);
-    setXIsNext(false);
-  };
-
-  const makeRandomMove = () => {
-    const emptyIndexes = squares.map((val, idx) => val === null ? idx : null).filter(i => i !== null);
-    if (emptyIndexes.length === 0) return;
-    const randomIndex = emptyIndexes[Math.floor(Math.random() * emptyIndexes.length)];
-    const nextSquares = squares.slice();
-    nextSquares[randomIndex] = 'O';
-    setSquares(nextSquares);
-    setXIsNext(true);
-  };
-
-  const renderSquare = (i) => (
-    <div className={`square ${squares[i] === 'X' ? 'x' : squares[i] === 'O' ? 'o' : ''}`} onClick={() => handleClick(i)}>
-      {squares[i]}
-    </div>
-  );
+    window.addEventListener('keydown', handleKey);
+    return () => window.removeEventListener('keydown', handleKey);
+  });
 
   const resetGame = () => {
-    setSquares(Array(BOARD_SIZE * BOARD_SIZE).fill(null));
-    setXIsNext(true);
+    setGrid(addRandomTile(addRandomTile(generateEmptyGrid())));
   };
-
-  const rows = [];
-  for (let row = 0; row < BOARD_SIZE; row++) {
-    const cols = [];
-    for (let col = 0; col < BOARD_SIZE; col++) {
-      cols.push(renderSquare(row * BOARD_SIZE + col));
-    }
-    rows.push(<div className="board-row" key={row}>{cols}</div>);
-  }
 
   return (
     <div className="game">
-      <div className="status">
-        {winner ? `Winner: ${winner}` : `Next player: ${xIsNext ? 'X' : 'O'}`}
+      <h1>2048</h1>
+      <div className="grid">
+        {grid.map((row, r) => (
+          <div key={r} className="row">
+            {row.map((val, c) => (
+              <div key={c} className={`cell value-${val}`}>{val !== 0 ? val : ''}</div>
+            ))}
+          </div>
+        ))}
       </div>
-      {rows}
-      <button className="reset" onClick={resetGame}>Reset</button>
+      <button className="reset" onClick={resetGame}>🔄 Reset</button>
     </div>
   );
-}
-
-function calculateWinner(squares) {
-  const lines = [];
-  const winLength = 5;
-
-  // Rows
-  for (let i = 0; i < BOARD_SIZE; i++) {
-    for (let j = 0; j <= BOARD_SIZE - winLength; j++) {
-      lines.push(Array(winLength).fill(0).map((_, k) => i * BOARD_SIZE + j + k));
-    }
-  }
-  // Columns
-  for (let i = 0; i <= BOARD_SIZE - winLength; i++) {
-    for (let j = 0; j < BOARD_SIZE; j++) {
-      lines.push(Array(winLength).fill(0).map((_, k) => (i + k) * BOARD_SIZE + j));
-    }
-  }
-  // Diagonals (top-left to bottom-right)
-  for (let i = 0; i <= BOARD_SIZE - winLength; i++) {
-    for (let j = 0; j <= BOARD_SIZE - winLength; j++) {
-      lines.push(Array(winLength).fill(0).map((_, k) => (i + k) * BOARD_SIZE + j + k));
-    }
-  }
-  // Diagonals (top-right to bottom-left)
-  for (let i = 0; i <= BOARD_SIZE - winLength; i++) {
-    for (let j = winLength - 1; j < BOARD_SIZE; j++) {
-      lines.push(Array(winLength).fill(0).map((_, k) => (i + k) * BOARD_SIZE + j - k));
-    }
-  }
-
-  for (const line of lines) {
-    const [first, ...rest] = line;
-    if (squares[first] && rest.every(index => squares[index] === squares[first])) {
-      return squares[first];
-    }
-  }
-  return null;
-}
+};
 
 export default App;
